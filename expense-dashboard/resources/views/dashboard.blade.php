@@ -15,6 +15,39 @@
                     </div>
                 @endif
 
+                {{-- Period switcher --}}
+                <div class="flex items-center gap-3">
+                    <a href="{{ route('dashboard', ['period_start' => $previousPeriodStart->toDateString()]) }}"
+                       class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#474238] text-[#f9f4ed]/70 transition hover:bg-[#544e42] hover:text-[#f6a06b] focus:outline-none focus:ring-2 focus:ring-[#f6a06b]/40"
+                       aria-label="Previous period">
+                        <svg class="h-4 w-4" stroke="currentColor" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </a>
+
+                    <select onchange="if (this.value) window.location.href = this.value"
+                        aria-label="Select period"
+                        class="min-w-0 flex-1 rounded-full border border-[#f9f4ed]/15 bg-[#474238] px-4 py-2 text-sm text-[#f9f4ed] focus:border-[#f6a06b] focus:outline-none focus:ring-2 focus:ring-[#f6a06b]/30 sm:flex-none">
+                        @foreach ($periodOptions as $option)
+                            <option value="{{ route('dashboard', ['period_start' => $option['start']->toDateString()]) }}" @selected($option['start']->isSameDay($periodStart))>{{ $option['label'] }}</option>
+                        @endforeach
+                    </select>
+
+                    <a href="{{ route('dashboard', ['period_start' => $nextPeriodStart->toDateString()]) }}"
+                       class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#474238] text-[#f9f4ed]/70 transition hover:bg-[#544e42] hover:text-[#f6a06b] focus:outline-none focus:ring-2 focus:ring-[#f6a06b]/40"
+                       aria-label="Next period">
+                        <svg class="h-4 w-4" stroke="currentColor" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+
+                    @unless ($isCurrentPeriod)
+                        <a href="{{ route('dashboard') }}" class="hidden shrink-0 text-sm font-semibold text-[#f6a06b] hover:text-[#ffc6a5] hover:underline sm:inline">
+                            Back to current period
+                        </a>
+                    @endunless
+                </div>
+
                 {{-- Summary cards --}}
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
                     <div class="rounded-[28px] bg-[#474238] p-6 shadow-[0_1px_2px_rgba(46,43,37,0.14)]">
@@ -84,6 +117,7 @@
                         </p>
                         <form method="POST" action="{{ route('ai-overview.store') }}">
                             @csrf
+                            <input type="hidden" name="period_start" value="{{ $periodStart->toDateString() }}">
                             <button type="submit"
                                 class="inline-flex items-center rounded-full bg-[#f6a06b] px-4 py-2 font-['Caprasimo'] text-xs uppercase tracking-widest text-[#2e2b25] transition hover:bg-[#ffc6a5] active:bg-[#d67f48] focus:outline-none focus:ring-2 focus:ring-[#f6a06b] focus:ring-offset-2 focus:ring-offset-[#474238]">
                                 {{ $periodSummary ? 'Regenerate' : 'Generate AI Overview' }}

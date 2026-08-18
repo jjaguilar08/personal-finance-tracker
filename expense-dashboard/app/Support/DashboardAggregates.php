@@ -30,9 +30,9 @@ class DashboardAggregates
      *     savingsProgress: ?int,
      * }
      */
-    public static function forUser(User $user): array
+    public static function forUser(User $user, ?Carbon $referenceDate = null): array
     {
-        $period = BudgetCycle::current($user->cycle_start_day);
+        $period = BudgetCycle::current($user->cycle_start_day, $referenceDate);
         $periodStart = $period['start'];
         $periodEnd = $period['end'];
 

@@ -6,6 +6,7 @@ use App\Models\Expense;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -44,6 +45,35 @@ class AiOverviewControllerTest extends TestCase
 
         $this->actingAs($user)->get('/dashboard')
             ->assertSee('This period you spent mostly on food and stayed under budget.');
+    }
+
+    public function test_generating_an_overview_for_a_non_current_period_targets_that_period(): void
+    {
+        // Aug 18: the calendar-month "current" period is August, so a July
+        // expense is only reachable through the period switcher - the
+        // overview generated for it must be scoped to July, not "now".
+        $this->travelTo(Carbon::create(2026, 8, 18));
+
+        $this->fakeAnthropicSuccess('You spent mostly on food in July.');
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-10']);
+
+        $response = $this->actingAs($user)->post(route('ai-overview.store'), ['period_start' => '2026-07-10']);
+
+        $response->assertRedirect(route('dashboard', ['period_start' => '2026-07-10']));
+
+        $this->assertDatabaseHas('period_summaries', [
+            'user_id' => $user->id,
+            'summary' => 'You spent mostly on food in July.',
+        ]);
+
+        // Viewing July shows the new summary; viewing the current (August)
+        // period, which has no expenses or summary of its own, must not.
+        $this->actingAs($user)->get('/dashboard?period_start=2026-07-10')
+            ->assertSee('You spent mostly on food in July.');
+        $this->actingAs($user)->get('/dashboard')
+            ->assertDontSee('You spent mostly on food in July.');
     }
 
     public function test_dashboard_includes_the_mobile_overview_toggle_once_a_summary_exists(): void

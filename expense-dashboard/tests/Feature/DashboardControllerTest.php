@@ -203,6 +203,72 @@ class DashboardControllerTest extends TestCase
         $response->assertSee("You haven't set a savings goal for this period yet.", false);
     }
 
+    public function test_period_start_query_param_switches_the_dashboard_to_a_different_period(): void
+    {
+        // Mirrors a user with a 17th-to-16th custom cycle: on Aug 18 the
+        // "current" period has already rolled to Aug 17 - Sep 16, so an
+        // expense from the just-ended Jul 17 - Aug 16 period is no longer
+        // visible by default and must be reachable via ?period_start=.
+        $this->travelTo(Carbon::create(2026, 8, 18));
+
+        $user = User::factory()->create(['cycle_start_day' => 17]);
+        Expense::factory()->for($user)->create(['amount' => 250, 'date' => '2026-08-01']);
+
+        // The "Recent Expenses" activity feed is intentionally not
+        // period-scoped (see DashboardControllerTest's own coverage of
+        // that), so this checks the period-scoped "Total Spent" figure
+        // instead of asserting the raw amount is absent from the page.
+        $default = $this->actingAs($user)->get('/dashboard');
+        $default->assertOk();
+        $default->assertSee('Aug 17 - Sep 16, 2026', false);
+        $default->assertSee('Total Spent This Period');
+        $default->assertSee('$0.00', false);
+
+        $switched = $this->actingAs($user)->get('/dashboard?period_start=2026-08-01');
+        $switched->assertOk();
+        $switched->assertSee('Jul 17 - Aug 16, 2026', false);
+        $switched->assertSee('$250.00', false);
+    }
+
+    public function test_an_unparseable_period_start_falls_back_to_the_current_period_instead_of_erroring(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-05']);
+
+        $response = $this->actingAs($user)->get('/dashboard?period_start=not-a-date');
+
+        $response->assertOk();
+        $response->assertSee('July 2026', false);
+        $response->assertSee('100.00');
+    }
+
+    public function test_period_switcher_prev_next_links_point_to_adjacent_periods(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee(route('dashboard', ['period_start' => '2026-06-01']), false);
+        $response->assertSee(route('dashboard', ['period_start' => '2026-08-01']), false);
+    }
+
+    public function test_period_switcher_dropdown_marks_the_viewed_period_selected(): void
+    {
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard?period_start=2026-06-10');
+
+        $response->assertOk();
+        $response->assertSee('value="'.route('dashboard', ['period_start' => '2026-06-01']).'" selected', false);
+    }
+
     public function test_another_users_custom_cycle_start_day_does_not_affect_this_users_period(): void
     {
         $this->travelTo(Carbon::create(2026, 7, 15));
