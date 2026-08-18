@@ -36,8 +36,16 @@ class DashboardAggregates
         $periodStart = $period['start'];
         $periodEnd = $period['end'];
 
+        // whereBetween() with plain date strings would silently exclude any
+        // expense dated on $periodEnd: SQLite persists the `date`-cast
+        // column as a full datetime string (e.g. "2026-08-16 00:00:00"),
+        // and in a string comparison that sorts *after* the bare
+        // "2026-08-16" upper bound, failing the <= check. whereDate()
+        // compares only the date part, so it isn't affected by the extra
+        // time component either side may or may not have.
         $periodExpenses = $user->expenses()
-            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->whereDate('date', '>=', $periodStart->toDateString())
+            ->whereDate('date', '<=', $periodEnd->toDateString())
             ->get();
 
         $totalSpent = $periodExpenses->sum('amount');

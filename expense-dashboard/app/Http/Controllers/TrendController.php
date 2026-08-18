@@ -33,8 +33,12 @@ class TrendController extends Controller
         $start = $periods->first()['start'];
         $end = $periods->last()['end'];
 
+        // whereDate(), not whereBetween() with plain date strings - see the
+        // comment in DashboardAggregates::forUser() for why the latter
+        // silently drops expenses dated on $end.
         $totalsByPeriodStart = $user->expenses()
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
             ->get()
             ->groupBy(fn ($expense) => BudgetCycle::periodContaining($expense->date, $cycleStartDay)['start']->toDateString())
             ->map(fn ($group) => $group->sum('amount'));

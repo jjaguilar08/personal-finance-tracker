@@ -203,6 +203,25 @@ class DashboardControllerTest extends TestCase
         $response->assertSee("You haven't set a savings goal for this period yet.", false);
     }
 
+    public function test_an_expense_dated_on_the_last_day_of_the_period_counts_toward_the_total(): void
+    {
+        // Regression test: SQLite persists the `date`-cast column as a full
+        // datetime string (e.g. "2026-07-31 00:00:00"), which sorts *after*
+        // a bare "2026-07-31" upper bound in a string comparison - a
+        // whereBetween() with plain date-string bounds would silently drop
+        // this expense from the period total it actually belongs to.
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 100, 'date' => '2026-07-01']);
+        Expense::factory()->for($user)->create(['amount' => 200, 'date' => '2026-07-31']);
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('300.00');
+    }
+
     public function test_period_start_query_param_switches_the_dashboard_to_a_different_period(): void
     {
         // Mirrors a user with a 17th-to-16th custom cycle: on Aug 18 the

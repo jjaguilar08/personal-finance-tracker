@@ -63,6 +63,24 @@ class TrendControllerTest extends TestCase
         $response->assertSee('$500.00');
     }
 
+    public function test_an_expense_dated_on_the_last_day_of_the_window_counts_toward_its_month(): void
+    {
+        // Regression test: SQLite persists the `date`-cast column as a full
+        // datetime string (e.g. "2026-07-31 00:00:00"), which sorts *after*
+        // a bare "2026-07-31" upper bound in a string comparison - a
+        // whereBetween() with plain date-string bounds would silently drop
+        // this expense from the 6-month window entirely.
+        $this->travelTo(Carbon::create(2026, 7, 15));
+
+        $user = User::factory()->create();
+        Expense::factory()->for($user)->create(['amount' => 250, 'date' => '2026-07-31']);
+
+        $response = $this->actingAs($user)->get('/trends');
+
+        $response->assertOk();
+        $response->assertSee('250.00');
+    }
+
     public function test_a_user_only_sees_their_own_data(): void
     {
         $this->travelTo(Carbon::create(2026, 7, 15));
